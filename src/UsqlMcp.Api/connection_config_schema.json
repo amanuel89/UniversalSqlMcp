@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Database Connection Configuration",
+  "description": "Schema for configuring database connections in the Universal SQL MCP system",
+  "type": "object",
+  "required": ["connection_id", "database_type", "connection_string"],
+  "properties": {
+    "connection_id": {
+      "type": "string",
+      "description": "Unique identifier for this connection",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "connection_name": {
+      "type": "string",
+      "description": "Human-readable name for this connection"
+    },
+    "database_type": {
+      "type": "string",
+      "description": "Type of database system",
+      "enum": ["postgresql", "sqlserver", "mysql", "oracle", "sqlite"]
+    },
+    "connection_string": {
+      "type": "string",
+      "description": "Connection string for the database (sensitive information)"
+    },
+    "schema_name": {
+      "type": "string",
+      "description": "Schema name to use (if applicable)"
+    },
+    "max_connections": {
+      "type": "integer",
+      "description": "Maximum number of connections to maintain in the pool",
+      "default": 10,
+      "minimum": 1
+    },
+    "connection_timeout": {
+      "type": "integer",
+      "description": "Connection timeout in seconds",
+      "default": 30,
+      "minimum": 1
+    },
+    "command_timeout": {
+      "type": "integer",
+      "description": "Command timeout in seconds",
+      "default": 60,
+      "minimum": 1
+    },
+    "read_only": {
+      "type": "boolean",
+      "description": "Whether to enforce read-only mode for this connection",
+      "default": true
+    },
+    "semantic_model_path": {
+      "type": "string",
+      "description": "Path to the semantic model YAML file for this connection (optional)"
+    },
+    "metadata_cache_duration": {
+      "type": "integer",
+      "description": "Duration in seconds to cache metadata (0 for no caching)",
+      "default": 3600,
+      "minimum": 0
+    },
+    "tags": {
+      "type": "array",
+      "description": "Tags for categorizing and filtering connections",
+      "items": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of this database connection"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "User who created this connection"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Timestamp when this connection was created",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Timestamp when this connection was last updated",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "connection_id": "prod-postgres-customers",
+      "connection_name": "Production Customer Database",
+      "database_type": "postgresql",
+      "connection_string": "Host=db.example.com;Database=customers;Username=readonly;Password=********",
+      "schema_name": "public",
+      "max_connections": 20,
+      "connection_timeout": 30,
+      "command_timeout": 120,
+      "read_only": true,
+      "semantic_model_path": "/models/customer_semantic_model.yaml",
+      "metadata_cache_duration": 3600,
+      "tags": ["production", "customer-data"],
+      "description": "Production PostgreSQL database containing customer information",
+      "created_by": "admin",
+      "created_at": "2023-01-15T08:30:00Z",
+      "updated_at": "2023-01-15T08:30:00Z"
+    }
+  ]
+}

@@ -1,0 +1,365 @@
+namespace UsqlMcp.Infrastructure.Repositories;
+
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Linq;
+using System.Threading.Tasks;
+using Dapper;
+using Microsoft.Extensions.Logging;
+using UsqlMcp.Domain.Interfaces;
+using UsqlMcp.Domain.Models.Metadata;
+using UsqlMcp.Infrastructure.Services;
+using System.Text;
+
+public class MetadataRepository : IMetadataRepository
+{
+    private readonly IDatabaseConnectionFactory _connectionFactory;
+    private readonly ISqlScriptProvider _sqlScriptProvider;
+    private readonly ILogger<MetadataRepository> _logger;
+    private readonly IConnectionRepository _connectionRepository;
+
+    public MetadataRepository(
+        IDatabaseConnectionFactory connectionFactory,
+        ISqlScriptProvider sqlScriptProvider,
+        ILogger<MetadataRepository> logger,
+        IConnectionRepository connectionRepository)
+    {
+        _connectionFactory = connectionFactory;
+        _sqlScriptProvider = sqlScriptProvider;
+        _logger = logger;
+        _connectionRepository = connectionRepository;
+    }
+
+    public async Task<DatabaseMetadata> GetDatabaseMetadataAsync(string connectionId)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var dbConnection = await _connectionRepository.GetConnectionByIdAsync(connectionId);
+        
+        if (dbConnection == null)
+        {
+            throw new ArgumentException($"Connection with ID {connectionId} not found");
+        }
+    
+        var metadata = new DatabaseMetadata
+        {
+            DatabaseName = connection.Database,
+            Tables = await GetTablesAsync(connectionId),
+            Views = await GetViewsAsync(connectionId),
+            StoredProcedures = await GetStoredProceduresAsync(connectionId),
+            Functions = await GetFunctionsAsync(connectionId)
+        };
+    
+        return metadata;
+    }
+
+    public async Task<List<TableMetadata>> GetTablesAsync(string connectionId)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var dbConnection = await _connectionRepository.GetConnectionByIdAsync(connectionId);
+        
+        if (dbConnection == null)
+        {
+            throw new ArgumentException($"Connection with ID {connectionId} not found");
+        }
+
+        var script = _sqlScriptProvider.GetMetadataScript(dbConnection.DatabaseType);
+        var tables = new List<TableMetadata>();
+
+        try
+        {
+            // IDbConnection doesn't have OpenAsync, so handle both sync and async cases
+            if (connection is DbConnection dbConn)
+            {
+                await dbConn.OpenAsync();
+            }
+            else
+            {
+                connection.Open();
+            }
+
+            // Extract tables query based on database type
+            string tablesQuery = ExtractQueryFromScript(script, "Tables Metadata");
+            var tableResults = await connection.QueryAsync<dynamic>(tablesQuery);
+
+            foreach (var table in tableResults)
+            {
+                var tableName = GetPropertyValue<string>(table, "table_name");
+                var tableMetadata = new TableMetadata
+                {
+                    Name = tableName,
+                    Description = GetPropertyValue<string>(table, "table_description"),
+                    Columns = await GetColumnsForTableAsync(connection, tableName, dbConnection.SchemaName),
+                    ForeignKeys = await GetForeignKeysForTableAsync(connection, tableName, dbConnection.SchemaName),
+                    Indexes = await GetIndexesForTableAsync(connection, tableName, dbConnection.SchemaName),
+                    PrimaryKeyColumns = (await GetPrimaryKeysForTableAsync(connection, tableName, dbConnection.SchemaName))
+                        .Select(pk => pk.ColumnName ?? string.Empty)
+                        .ToList()
+                };
+
+                tables.Add(tableMetadata);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting tables for connection {ConnectionId}", connectionId);
+            throw;
+        }
+
+        return tables;
+    }
+
+    public async Task<TableMetadata?> GetTableMetadataAsync(string connectionId, string tableName, string? schema = null)
+    {
+        var tables = await GetTablesAsync(connectionId);
+        return tables.Find(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<List<ViewMetadata>> GetViewsAsync(string connectionId)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var dbConnection = await _connectionRepository.GetConnectionByIdAsync(connectionId);
+        
+        if (dbConnection == null)
+        {
+            throw new ArgumentException($"Connection with ID {connectionId} not found");
+        }
+
+        var script = _sqlScriptProvider.GetMetadataScript(dbConnection.DatabaseType);
+        var views = new List<ViewMetadata>();
+
+        try
+        {
+            // IDbConnection doesn't have OpenAsync, so handle both sync and async cases
+            if (connection is DbConnection dbConn)
+            {
+                await dbConn.OpenAsync();
+            }
+            else
+            {
+                connection.Open();
+            }
+
+            // Extract views query based on database type
+            string viewsQuery = ExtractQueryFromScript(script, "Views");
+            var viewResults = await connection.QueryAsync<dynamic>(viewsQuery);
+
+            foreach (var view in viewResults)
+            {
+                var viewMetadata = new ViewMetadata
+                {
+                    Name = GetPropertyValue<string>(view, "view_name"),
+                    Definition = GetPropertyValue<string>(view, "view_definition")
+                };
+
+                views.Add(viewMetadata);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting views for connection {ConnectionId}", connectionId);
+            throw;
+        }
+
+        return views;
+    }
+
+    public async Task<ViewMetadata?> GetViewMetadataAsync(string connectionId, string viewName, string? schema = null)
+    {
+        var views = await GetViewsAsync(connectionId);
+        return views.Find(v => v.Name.Equals(viewName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<List<StoredProcedureMetadata>> GetStoredProceduresAsync(string connectionId)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var dbConnection = await _connectionRepository.GetConnectionByIdAsync(connectionId);
+        
+        if (dbConnection == null)
+        {
+            throw new ArgumentException($"Connection with ID {connectionId} not found");
+        }
+
+        var script = _sqlScriptProvider.GetMetadataScript(dbConnection.DatabaseType);
+        var procedures = new List<StoredProcedureMetadata>();
+
+        try
+        {
+            // IDbConnection doesn't have OpenAsync, so handle both sync and async cases
+            if (connection is DbConnection dbConn)
+            {
+                await dbConn.OpenAsync();
+            }
+            else
+            {
+                connection.Open();
+            }
+
+            // Extract stored procedures query based on database type
+            string proceduresQuery = ExtractQueryFromScript(script, "Stored Procedures");
+            var procedureResults = await connection.QueryAsync<dynamic>(proceduresQuery);
+
+            foreach (var procedure in procedureResults)
+            {
+                var procedureMetadata = new StoredProcedureMetadata
+                {
+                    Name = GetPropertyValue<string>(procedure, "procedure_name"),
+                    Definition = GetPropertyValue<string>(procedure, "procedure_definition"),
+                    Description = GetPropertyValue<string>(procedure, "procedure_description")
+                };
+
+                procedures.Add(procedureMetadata);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting stored procedures for connection {ConnectionId}", connectionId);
+            throw;
+        }
+
+        return procedures;
+    }
+
+    public async Task<List<FunctionMetadata>> GetFunctionsAsync(string connectionId)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var dbConnection = await _connectionRepository.GetConnectionByIdAsync(connectionId);
+        
+        if (dbConnection == null)
+        {
+            throw new ArgumentException($"Connection with ID {connectionId} not found");
+        }
+
+        var script = _sqlScriptProvider.GetMetadataScript(dbConnection.DatabaseType);
+        var functions = new List<FunctionMetadata>();
+
+        try
+        {
+            // IDbConnection doesn't have OpenAsync, so handle both sync and async cases
+            if (connection is DbConnection dbConn)
+            {
+                await dbConn.OpenAsync();
+            }
+            else
+            {
+                connection.Open();
+            }
+
+            // Extract functions query based on database type
+            string functionsQuery = ExtractQueryFromScript(script, "Functions");
+            var functionResults = await connection.QueryAsync<dynamic>(functionsQuery);
+
+            foreach (var function in functionResults)
+            {
+                var functionMetadata = new FunctionMetadata
+                {
+                    Name = GetPropertyValue<string>(function, "function_name"),
+                    Definition = GetPropertyValue<string>(function, "function_definition"),
+                    Description = GetPropertyValue<string>(function, "function_description")
+                };
+
+                functions.Add(functionMetadata);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting functions for connection {ConnectionId}", connectionId);
+            throw;
+        }
+
+        return functions;
+    }
+
+    // Helper methods for extracting data
+    private string ExtractQueryFromScript(string script, string sectionName)
+    {
+        // Simple extraction based on comment markers
+        var lines = script.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        var inSection = false;
+        var query = new StringBuilder();
+
+        foreach (var line in lines)
+        {
+            if (line.Contains($"-- {sectionName}") || line.Contains($"/* {sectionName}"))
+            {
+                inSection = true;
+                continue;
+            }
+
+            if (inSection && (line.StartsWith("--") && !line.Contains("FROM") && !line.Contains("WHERE") && !line.Contains("JOIN")))
+            {
+                // End of section
+                break;
+            }
+
+            if (inSection && !line.StartsWith("--") && !string.IsNullOrWhiteSpace(line))
+            {
+                query.AppendLine(line);
+            }
+        }
+
+        return query.ToString();
+    }
+
+    private T? GetPropertyValue<T>(dynamic obj, string propertyName)
+    {
+        if (obj is IDictionary<string, object> dict)
+        {
+            if (dict.TryGetValue(propertyName, out var value))
+            {
+                return (T)Convert.ChangeType(value, typeof(T));
+            }
+
+            // Try case-insensitive lookup
+            foreach (var key in dict.Keys)
+            {
+                if (key.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (T)Convert.ChangeType(dict[key], typeof(T));
+                }
+            }
+        }
+
+        try
+        {
+            var prop = obj.GetType().GetProperty(propertyName);
+            if (prop != null)
+            {
+                return (T)prop.GetValue(obj);
+            }
+        }
+        catch
+        {
+            // Property doesn't exist or can't be accessed
+        }
+
+        return default;
+    }
+
+    // Helper methods for getting table details
+    private async Task<List<ColumnMetadata>> GetColumnsForTableAsync(IDbConnection connection, string tableName, string? schema)
+    {
+        // Implementation depends on database type
+        // This is a simplified version
+        return new List<ColumnMetadata>();
+    }
+
+    private async Task<List<PrimaryKeyMetadata>> GetPrimaryKeysForTableAsync(IDbConnection connection, string tableName, string? schema)
+    {
+        // Implementation depends on database type
+        return new List<PrimaryKeyMetadata>();
+    }
+
+    private async Task<List<ForeignKeyMetadata>> GetForeignKeysForTableAsync(IDbConnection connection, string tableName, string? schema)
+    {
+        // Implementation depends on database type
+        return new List<ForeignKeyMetadata>();
+    }
+
+    private async Task<List<IndexMetadata>> GetIndexesForTableAsync(IDbConnection connection, string tableName, string? schema)
+    {
+        // Implementation depends on database type
+        return new List<IndexMetadata>();
+    }
+}

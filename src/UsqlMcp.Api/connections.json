@@ -1,0 +1,22 @@
+{
+  "connections": [
+
+    {
+      "connection_id": "sqlserver-northwind",
+      "connection_name": "SQL Server Northwind",
+      "database_type": 1,
+      "connection_string": "Server=localhost;Database=Northwind;User Id=sa;Password=Password123!;TrustServerCertificate=True;",
+      "max_connections": 15,
+      "connection_timeout": 30,
+      "command_timeout": 120,
+      "read_only": true,
+      "semantic_model_path": "./semantic_models/northwind.yaml",
+      "metadata_cache_duration": 3600,
+      "tags": ["sample", "northwind"],
+      "description": "Microsoft SQL Server Northwind sample database",
+      "created_by": "developer",
+      "created_at": "2023-06-02T11:30:00Z",
+      "updated_at": "2023-06-02T11:30:00Z"
+    }
+  ]
+}

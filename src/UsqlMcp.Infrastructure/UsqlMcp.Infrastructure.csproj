@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\UsqlMcp.Domain\UsqlMcp.Domain.csproj" />
+    <ProjectReference Include="..\UsqlMcp.Application\UsqlMcp.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.5" />
+    <PackageReference Include="MySql.Data" Version="9.3.0" />
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.8.0" />
+    <PackageReference Include="YamlDotNet" Version="12.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SqlScripts\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

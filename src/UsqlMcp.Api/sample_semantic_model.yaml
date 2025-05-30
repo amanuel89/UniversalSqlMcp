@@ -1,0 +1,238 @@
+# Sample Semantic Model Definition for UsqlMcp
+# This YAML file demonstrates how to define business meaning for database objects
+
+# Database connection identifier (used to associate this semantic model with a specific connection)
+connection_id: "sample_airline_db"
+
+# Database name (for documentation purposes)
+database_name: "Airline Reservation System"
+
+# Database description
+description: |
+  This database contains tables related to airline reservations, flights, passengers, and ticketing.
+  It is used by the airline reservation system to manage bookings and flight operations.
+
+# Table definitions with semantic information
+tables:
+  # Flights table
+  flights:
+    display_name: "Flights"
+    description: "Contains information about scheduled flights"
+    business_area: "Operations"
+    update_frequency: "Daily"
+    columns:
+      flight_id:
+        display_name: "Flight ID"
+        description: "Unique identifier for each flight"
+        business_definition: "System-generated unique identifier for each flight instance"
+        data_type: "integer"
+        is_primary_key: true
+      
+      flight_number:
+        display_name: "Flight Number"
+        description: "Airline assigned flight number"
+        business_definition: "Commercial flight number assigned by the airline for marketing purposes"
+        data_type: "varchar"
+        format: "AA999"
+        example: "BA123"
+      
+      departure_airport_code:
+        display_name: "Departure Airport"
+        description: "IATA code for departure airport"
+        business_definition: "Three-letter IATA airport code for the departure location"
+        data_type: "char"
+        format: "AAA"
+        example: "LAX"
+        foreign_key:
+          table: "airports"
+          column: "airport_code"
+      
+      arrival_airport_code:
+        display_name: "Arrival Airport"
+        description: "IATA code for arrival airport"
+        business_definition: "Three-letter IATA airport code for the arrival location"
+        data_type: "char"
+        format: "AAA"
+        example: "JFK"
+        foreign_key:
+          table: "airports"
+          column: "airport_code"
+      
+      scheduled_departure_time:
+        display_name: "Scheduled Departure Time"
+        description: "Scheduled time of departure"
+        business_definition: "The planned departure time in UTC"
+        data_type: "timestamp"
+        time_zone: "UTC"
+      
+      scheduled_arrival_time:
+        display_name: "Scheduled Arrival Time"
+        description: "Scheduled time of arrival"
+        business_definition: "The planned arrival time in UTC"
+        data_type: "timestamp"
+        time_zone: "UTC"
+      
+      aircraft_id:
+        display_name: "Aircraft ID"
+        description: "Identifier for the aircraft assigned to the flight"
+        business_definition: "Reference to the specific aircraft assigned to operate this flight"
+        data_type: "integer"
+        foreign_key:
+          table: "aircraft"
+          column: "aircraft_id"
+      
+      status:
+        display_name: "Flight Status"
+        description: "Current status of the flight"
+        business_definition: "Operational status of the flight (Scheduled, Boarding, In-Air, Landed, Cancelled, Delayed)"
+        data_type: "varchar"
+        allowed_values: ["Scheduled", "Boarding", "In-Air", "Landed", "Cancelled", "Delayed"]
+
+  # Passengers table
+  passengers:
+    display_name: "Passengers"
+    description: "Contains information about registered passengers"
+    business_area: "Customer"
+    update_frequency: "Real-time"
+    columns:
+      passenger_id:
+        display_name: "Passenger ID"
+        description: "Unique identifier for each passenger"
+        business_definition: "System-generated unique identifier for each registered passenger"
+        data_type: "integer"
+        is_primary_key: true
+      
+      first_name:
+        display_name: "First Name"
+        description: "Passenger's first name"
+        business_definition: "Passenger's legal first name as it appears on identification documents"
+        data_type: "varchar"
+        pii: true
+      
+      last_name:
+        display_name: "Last Name"
+        description: "Passenger's last name"
+        business_definition: "Passenger's legal last name as it appears on identification documents"
+        data_type: "varchar"
+        pii: true
+      
+      email:
+        display_name: "Email Address"
+        description: "Passenger's email address"
+        business_definition: "Primary contact email address for the passenger"
+        data_type: "varchar"
+        format: "email"
+        pii: true
+      
+      phone_number:
+        display_name: "Phone Number"
+        description: "Passenger's contact phone number"
+        business_definition: "Primary contact phone number for the passenger"
+        data_type: "varchar"
+        format: "phone"
+        pii: true
+      
+      frequent_flyer_number:
+        display_name: "Frequent Flyer Number"
+        description: "Passenger's frequent flyer program number"
+        business_definition: "Unique identifier for the passenger in the airline's loyalty program"
+        data_type: "varchar"
+        nullable: true
+
+  # Bookings table
+  bookings:
+    display_name: "Bookings"
+    description: "Contains information about flight bookings"
+    business_area: "Sales"
+    update_frequency: "Real-time"
+    columns:
+      booking_id:
+        display_name: "Booking ID"
+        description: "Unique identifier for each booking"
+        business_definition: "System-generated unique identifier for each booking transaction"
+        data_type: "integer"
+        is_primary_key: true
+      
+      booking_reference:
+        display_name: "Booking Reference"
+        description: "Booking reference code"
+        business_definition: "Human-readable booking reference code provided to customers"
+        data_type: "varchar"
+        format: "AAAAAA"
+        example: "ABC123"
+      
+      booking_date:
+        display_name: "Booking Date"
+        description: "Date and time when the booking was made"
+        business_definition: "Timestamp when the booking was created in the system"
+        data_type: "timestamp"
+      
+      passenger_id:
+        display_name: "Passenger ID"
+        description: "Reference to the passenger who made the booking"
+        business_definition: "Foreign key reference to the passenger who owns this booking"
+        data_type: "integer"
+        foreign_key:
+          table: "passengers"
+          column: "passenger_id"
+      
+      total_amount:
+        display_name: "Total Amount"
+        description: "Total cost of the booking"
+        business_definition: "Sum of all ticket prices and fees in the booking"
+        data_type: "decimal"
+        format: "currency"
+      
+      payment_status:
+        display_name: "Payment Status"
+        description: "Current status of payment for this booking"
+        business_definition: "Indicates whether the booking has been paid for"
+        data_type: "varchar"
+        allowed_values: ["Pending", "Paid", "Refunded", "Failed"]
+
+# Relationships between tables (beyond foreign keys)
+relationships:
+  - name: "flight_bookings"
+    description: "Connects flights to bookings through the tickets table"
+    relationship_type: "many-to-many"
+    from_table: "flights"
+    to_table: "bookings"
+    through_table: "tickets"
+    from_column: "flight_id"
+    through_from_column: "flight_id"
+    through_to_column: "booking_id"
+    to_column: "booking_id"
+
+# Business metrics that can be calculated from the data
+metrics:
+  - name: "average_ticket_price"
+    display_name: "Average Ticket Price"
+    description: "Average price of tickets sold"
+    calculation: "AVG(tickets.price)"
+    format: "currency"
+    business_area: "Finance"
+  
+  - name: "booking_completion_rate"
+    display_name: "Booking Completion Rate"
+    description: "Percentage of bookings that are successfully paid for"
+    calculation: "COUNT(CASE WHEN bookings.payment_status = 'Paid' THEN 1 END) / COUNT(*) * 100"
+    format: "percentage"
+    business_area: "Sales"
+  
+  - name: "flight_occupancy_rate"
+    display_name: "Flight Occupancy Rate"
+    description: "Percentage of seats filled on flights"
+    calculation: "COUNT(tickets.ticket_id) / MAX(aircraft.seat_capacity) * 100"
+    format: "percentage"
+    business_area: "Operations"
+
+# Business glossary of terms used in the model
+glossary:
+  - term: "IATA Code"
+    definition: "Three-letter code assigned by the International Air Transport Association to identify airports"
+  
+  - term: "Booking Reference"
+    definition: "A unique alphanumeric code assigned to a booking that customers can use to reference their reservation"
+  
+  - term: "Frequent Flyer"
+    definition: "A customer enrolled in the airline's loyalty program who earns points or miles for flights taken"
