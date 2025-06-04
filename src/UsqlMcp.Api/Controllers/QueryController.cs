@@ -49,6 +49,38 @@ public class QueryController : ControllerBase
         }
     }
 
+
+    /// <summary>
+    /// Executes a read-only SQL query against a database connection
+    /// </summary>
+    /// <param name="connectionId">The unique identifier of the database connection</param>
+    /// <param name="request">The query request containing the SQL query </param>
+    /// <returns>The query result with columns and data</returns>
+    /// <response code="200">Returns the query result</response>
+    /// <response code="400">If the query is not read-only or contains syntax errors</response>
+    /// <response code="404">If the connection is not found</response>
+    [HttpPost("executedirectquery/{connectionId}")]
+    [ProducesResponseType(typeof(QueryResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<QueryResult>> ExecuteDirectQuery(string connectionId, [FromBody] SingleQueryRequest request)
+    {
+        try
+        {
+            var result = await _queryService.ExecuteDirectQueryAsync(connectionId, request.Query);
+            if (result == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(result);
+        }
+        catch (System.InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     /// <summary>
     /// Gets a sample of data from a specific table
     /// </summary>
@@ -88,4 +120,10 @@ public class QueryRequest
     /// Maximum number of rows to return
     /// </summary>
     public int MaxRows { get; set; } = 100;
+}
+
+public class SingleQueryRequest
+{ 
+    public string Query { get; set; } = string.Empty;
+     
 }

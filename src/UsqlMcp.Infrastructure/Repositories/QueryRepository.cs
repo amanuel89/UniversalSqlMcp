@@ -121,6 +121,89 @@ public class QueryRepository : IQueryRepository
         }
     }
 
+    public async Task<QueryResult> ExecuteDirectQueryAsync(string connectionId, string query)
+    {
+        using var connection = _connectionFactory.CreateConnection(connectionId);
+        var stopwatch = new Stopwatch();
+
+        try
+        {
+            // For non-DbConnection objects, open synchronously
+            if (connection is DbConnection dbConnection)
+            {
+                await dbConnection.OpenAsync();
+            }
+            else
+            {
+                connection.Open();
+            }
+
+            stopwatch.Start();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = query;
+            command.CommandTimeout = 30; // Default timeout
+
+            // For non-DbCommand objects, execute synchronously
+            IDataReader reader;
+            if (command is DbCommand dbCommand)
+            {
+                reader = await dbCommand.ExecuteReaderAsync();
+            }
+            else
+            {
+                reader = command.ExecuteReader();
+            }
+
+            using (reader)
+            {
+                var columns = new List<string>();
+                var rows = new List<List<object?>>();
+                var totalRows = 0;
+
+                // Get column names
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    columns.Add(reader.GetName(i));
+                }
+
+                // Read all rows
+                while (reader.Read())
+                {
+                    var row = new List<object?>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        row.Add(reader.IsDBNull(i) ? null : reader.GetValue(i));
+                    }
+                    rows.Add(row);
+                    totalRows++;
+                }
+
+                stopwatch.Stop();
+
+                return new QueryResult
+                {
+                    Columns = columns,
+                    Rows = rows,
+                    TotalRows = totalRows,
+                    Truncated = false, 
+                    ExecutionTimeMs = stopwatch.ElapsedMilliseconds
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing query for connection {ConnectionId}", connectionId);
+            throw;
+        }
+        finally
+        {
+            if (stopwatch.IsRunning)
+            {
+                stopwatch.Stop();
+            }
+        }
+    }
     public async Task<QueryResult> GetTableSampleAsync(string connectionId, string tableName, string? schema = null, int maxRows = 10)
     {
         // Build a simple SELECT query for the table
